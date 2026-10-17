@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northstar Demo | Home</title>
+<style>
+:root { --color-primary: #1947a3; --font-body: Arial, sans-serif; --radius-card: 12px; }
+body { font-family: var(--font-body); margin: 0; color: #171a22; }
+header, footer { background: #f1f5ff; padding: 20px; }
+nav { display: flex; gap: 24px; }
+main { max-width: 1020px; margin: auto; padding: 32px; }
+.card { border: 1px solid #e0e3ee; border-radius: var(--radius-card); padding: 24px; }
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+button { background: var(--color-primary); color: white; border: 0; padding: 10px 18px; border-radius: 6px; }
+@media (max-width: 600px) { .cards { grid-template-columns: 1fr; } main { padding: 16px; } }
+</style></head>
+<body><header><nav aria-label="Primary"><a href="/">Home</a><a href="/about/">About</a></nav></header>
+<main><section><h1>Welcome to Northstar</h1><p>A fictional demo used solely to test browser capture.</p><button type="button">Explore</button></section>
+<section class="cards"><article class="card"><h2>Plan</h2><p>Build better product experiences.</p></article>
+<article class="card"><h2>Ship</h2><p>Test responsive layouts.</p></article></section></main>
+<footer><a href="/about/">Learn about us</a></footer></body></html>
