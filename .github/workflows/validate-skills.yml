@@ -30,3 +30,36 @@ jobs:
         run: python3 -m unittest discover -s website-reverse-engineer/tests -v
       - name: Generate fixture report
         run: python3 website-reverse-engineer/scripts/analyze_capture.py website-reverse-engineer/examples/sample_capture.json --output /tmp/website-report.md
+  browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser capture dependencies
+        working-directory: website-reverse-engineer
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Capture a synthetic local public website
+        run: |
+          python3 -m http.server 8877 --bind 127.0.0.1 --directory website-reverse-engineer/examples/site >/tmp/skill-site.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          sleep 2
+          node website-reverse-engineer/scripts/capture_site.mjs --url http://127.0.0.1:8877/ --out /tmp/v2-capture --crawl --max-pages 2 --delay-ms 900
+          python3 website-reverse-engineer/scripts/analyze_capture.py /tmp/v2-capture/capture.json --output /tmp/v2-capture/REPORT.md
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          folder = Path("/tmp/v2-capture")
+          data = json.loads((folder / "capture.json").read_text())
+          assert len(data["pages"]) == 2, data["warnings"]
+          for page in data["pages"]:
+              for name in ("desktop", "mobile"):
+                  view = page["viewports"][name]
+                  assert (folder / view["screenshot"]).is_file()
+          assert "flowchart LR" in (folder / "REPORT.md").read_text()
+          print("Browser smoke test passed:", len(data["pages"]), "pages")
+          PY
