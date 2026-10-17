@@ -1,0 +1,32 @@
+name: Validate AI Skills
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python syntax check
+        run: |
+          python3 -m py_compile reverse-engineer/scripts/inspect_repo.py
+          python3 -m py_compile website-reverse-engineer/scripts/analyze_capture.py
+      - name: Browser capture script syntax check
+        run: node --check website-reverse-engineer/scripts/capture_site.mjs
+      - name: Legacy skill tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Website v2 offline tests
+        run: python3 -m unittest discover -s website-reverse-engineer/tests -v
+      - name: Generate fixture report
+        run: python3 website-reverse-engineer/scripts/analyze_capture.py website-reverse-engineer/examples/sample_capture.json --output /tmp/website-report.md
