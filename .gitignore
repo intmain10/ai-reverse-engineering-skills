@@ -5,3 +5,5 @@ __pycache__/
 .venv/
 node_modules/
 reports/
+website-reverse-engineer/node_modules/
+website-reverse-engineer/reports/
