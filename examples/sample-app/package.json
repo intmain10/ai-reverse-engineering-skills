@@ -1,0 +1,6 @@
+{
+  "name": "example-shop-frontend",
+  "private": true,
+  "dependencies": {"react": "^19.0.0", "react-router-dom": "^7.0.0", "axios": "^1.0.0"},
+  "devDependencies": {"vite": "^6.0.0", "typescript": "^5.0.0"}
+}
