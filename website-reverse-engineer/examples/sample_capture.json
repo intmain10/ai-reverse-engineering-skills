@@ -1,0 +1,125 @@
+{
+  "schema_version": 2,
+  "target": "https://example.org/",
+  "captured_at": "2026-10-17T00:00:00Z",
+  "pages": [
+    {
+      "path": "/",
+      "viewports": {
+        "desktop": {
+          "title": "Demo",
+          "screenshot": "screenshots/home-desktop.png",
+          "landmarks": [
+            {
+              "tag": "header"
+            },
+            {
+              "tag": "nav"
+            },
+            {
+              "tag": "main"
+            },
+            {
+              "tag": "section"
+            },
+            {
+              "tag": "footer"
+            }
+          ],
+          "headings": [
+            {
+              "level": "h1",
+              "text": "Welcome"
+            }
+          ],
+          "controls": [
+            {
+              "tag": "a",
+              "label": "About"
+            }
+          ],
+          "links": [
+            "/about"
+          ],
+          "tokens": {
+            "text_colors": [
+              {
+                "value": "rgb(20, 20, 20)",
+                "count": 8
+              }
+            ],
+            "backgrounds": [
+              {
+                "value": "rgb(255, 255, 255)",
+                "count": 5
+              }
+            ],
+            "fonts": [
+              {
+                "value": "Arial",
+                "count": 3
+              }
+            ],
+            "font_sizes": [
+              {
+                "value": "16px",
+                "count": 6
+              }
+            ],
+            "radii": []
+          }
+        },
+        "mobile": {
+          "title": "Demo",
+          "screenshot": "screenshots/home-mobile.png",
+          "landmarks": [
+            {
+              "tag": "header"
+            },
+            {
+              "tag": "main"
+            }
+          ],
+          "headings": [
+            {
+              "level": "h1",
+              "text": "Welcome"
+            }
+          ],
+          "controls": [],
+          "links": [
+            "/about"
+          ],
+          "tokens": {}
+        }
+      }
+    },
+    {
+      "path": "/about",
+      "viewports": {
+        "desktop": {
+          "screenshot": "screenshots/about-desktop.png",
+          "landmarks": [
+            {
+              "tag": "main"
+            }
+          ],
+          "headings": [
+            {
+              "level": "h1",
+              "text": "About"
+            }
+          ],
+          "controls": [],
+          "links": [
+            "/"
+          ],
+          "tokens": {}
+        }
+      }
+    }
+  ],
+  "warnings": [
+    "Sanitized public sample"
+  ]
+}
