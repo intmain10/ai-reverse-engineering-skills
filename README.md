@@ -70,3 +70,37 @@ gh repo create ai-reverse-engineering-skills --public --source=. --remote=origin
 Only inspect resources you own or are authorized to inspect. Do not attempt bypasses of access controls or anti-bot measures, access hidden/private information, copy protected assets without permission, or publish someone else's confidential source. The skill treats any analyzed content as untrusted data.
 
 MIT licensed.
+
+---
+
+## Website Reverse Engineer v2 (new)
+
+A dedicated Agent Skill for **authorized public websites**, with responsive screenshots, navigation maps, UI-component hints, sampled design tokens, and an evidence-grounded clean-room rebuild report.
+
+- [Skill instructions](website-reverse-engineer/SKILL.md)
+- [Installation, usage and tests](website-reverse-engineer/README.md)
+- [Browser capture helper](website-reverse-engineer/scripts/capture_site.mjs)
+- [Offline report generator](website-reverse-engineer/scripts/analyze_capture.py)
+
+### Quick start
+
+Requires Node.js 20+, Python 3.9+, and a local Chromium install:
+
+```bash
+cd website-reverse-engineer
+npm install
+npx playwright install chromium
+
+# Observe a single authorized public URL, desktop and mobile
+node scripts/capture_site.mjs --url https://example.com --out ./reports/example
+
+# Generate evidence-labeled Markdown, including a Mermaid navigation map
+python3 scripts/analyze_capture.py ./reports/example/capture.json --output ./reports/example/REPORT.md
+
+# Offline unit tests
+npm test
+```
+
+For a limited, authorized same-origin crawl, opt in with `--crawl --max-pages 3`. The tool consults robots.txt and never logs in or submits forms. **Do not use it to bypass access restrictions or copy someone else's protected source or assets.**
+
+To install this skill in a compatible AI agent, copy the full `website-reverse-engineer/` folder to a supported skills directory (for example, `.claude/skills/` or `.agents/skills/`).
