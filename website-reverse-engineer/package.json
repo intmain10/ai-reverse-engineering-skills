@@ -1,0 +1,16 @@
+{
+  "name": "website-reverse-engineer-skill",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Read-only UI capture helper for the website-reverse-engineer Agent Skill",
+  "type": "module",
+  "engines": {"node": ">=20"},
+  "scripts": {
+    "capture": "node scripts/capture_site.mjs",
+    "test": "node --check scripts/capture_site.mjs && python3 -m unittest discover -s tests -v"
+  },
+  "dependencies": {
+    "playwright": "^1.58.0",
+    "robots-parser": "^3.0.1"
+  }
+}
