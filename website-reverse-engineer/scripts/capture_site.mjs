@@ -11,6 +11,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const USER_AGENT = 'WebsiteReverseEngineerBot';
+const SETTLE_TIMEOUT_MS = 5_000;
 const VIEWPORTS = {
   desktop: { width: 1440, height: 900 },
   mobile: { width: 390, height: 844 },
@@ -22,7 +23,8 @@ function usage() {
 
 By default only the exact starting public page is inspected.
 --crawl opts into following visible same-origin links, up to --max-pages (1-10).
-The script respects robots.txt; a blocked/unavailable robots policy stops capture.
+The script respects robots.txt (RFC 9309): a missing (4xx) file allows capture,
+an unreachable or 5xx robots.txt stops it.
 Use ONLY on websites you have permission to inspect.`;
 }
 
@@ -62,6 +64,49 @@ function canonical(href, base) {
     url.hash = '';
     return url.toString();
   } catch { return null; }
+}
+
+/**
+ * Fetch and parse robots.txt following RFC 9309: up to 5 redirects; any 4xx means
+ * "no rules"; 5xx or network failure means "unreachable", which we treat as full disallow.
+ */
+async function loadRobots(browser, startUrl, userAgent) {
+  const robotsURL = new URL('/robots.txt', startUrl).toString();
+  const context = await browser.newContext({ serviceWorkers: 'block', userAgent });
+  try {
+    let response;
+    try {
+      response = await context.request.get(robotsURL, { timeout: 12_000, maxRedirects: 5 });
+    } catch (err) {
+      throw new Error(`robots.txt unreachable (${String(err.message).split('\n')[0].slice(0, 120)}); refusing to capture`);
+    }
+    const status = response.status();
+    if (status >= 400 && status < 500) {
+      return { robots: { isAllowed: () => true }, note: `robots.txt HTTP ${status}: treated as no restrictions` };
+    }
+    if (!response.ok()) throw new Error(`robots.txt HTTP ${status}; refusing to capture`);
+    return { robots: robotsParser(response.url(), await response.text()), note: null };
+  } finally { await context.close(); }
+}
+
+/** Let client-rendered pages finish: wait for network quiet and web fonts, both capped. */
+async function settle(page) {
+  await page.waitForLoadState('networkidle', { timeout: SETTLE_TIMEOUT_MS }).catch(() => {});
+  await page.evaluate(() => Promise.race([
+    document.fonts ? document.fonts.ready : Promise.resolve(),
+    new Promise(resolve => setTimeout(resolve, 2_000)),
+  ])).catch(() => {});
+  await page.waitForTimeout(300);
+}
+
+async function botUserAgent(browser) {
+  // Identify as the same token robots.txt is checked against, keeping the engine's own UA prefix.
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    const base = await page.evaluate(() => navigator.userAgent);
+    return `${base} ${USER_AGENT}/2.0`;
+  } finally { await context.close(); }
 }
 
 function fileSlug(url) {
@@ -145,19 +190,8 @@ async function main() {
   try {
     const out = path.resolve(args.out);
     await fs.mkdir(path.join(out, 'screenshots'), { recursive: true });
-    const robotsURL = new URL('/robots.txt', args.url).toString();
-    const request = await browser.newContext({ serviceWorkers: 'block' });
-    let robots;
-    try {
-      const response = await request.request.get(robotsURL, { timeout: 12_000, maxRedirects: 0 });
-      if (response.status() === 404 || response.status() === 410) {
-        robots = { isAllowed: () => true };
-      } else {
-        if (!response.ok()) throw new Error(`robots.txt HTTP ${response.status()}`);
-        const text = await response.text();
-        robots = robotsParser(robotsURL, text);
-      }
-    } finally { await request.close(); }
+    const userAgent = await botUserAgent(browser);
+    const { robots, note: robotsNote } = await loadRobots(browser, args.url, userAgent);
 
     const queue = [args.url], seen = new Set();
     const report = {
@@ -168,6 +202,7 @@ async function main() {
         'Screenshots may capture visible personal data; inspect and redact before sharing.'
       ],
     };
+    if (robotsNote) report.warnings.push(robotsNote);
     while (queue.length && report.pages.length < (args.crawl ? args.maxPages : 1)) {
       const url = queue.shift();
       if (seen.has(url)) continue;
@@ -178,11 +213,11 @@ async function main() {
       }
       const entry = { path: new URL(url).pathname, viewports: {} };
       for (const [name, viewport] of Object.entries(VIEWPORTS)) {
-        const context = await browser.newContext({ viewport, deviceScaleFactor: 1, reducedMotion: 'reduce', serviceWorkers: 'block' });
+        const context = await browser.newContext({ viewport, userAgent, deviceScaleFactor: 1, reducedMotion: 'reduce', serviceWorkers: 'block' });
         const page = await context.newPage();
         try {
           const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 });
-          await page.waitForTimeout(500);
+          await settle(page);
           const finalUrl = page.url();
           if (!canonical(finalUrl, args.url) || robots.isAllowed(finalUrl, USER_AGENT) === false) {
             report.warnings.push(`Navigation escaped approved page scope: ${new URL(url).pathname}`);

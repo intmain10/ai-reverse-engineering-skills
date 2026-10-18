@@ -19,17 +19,57 @@ def clean(value, width: int = 100) -> str:
     return re.sub(r"\s+", " ", text)[:width]
 
 
+def as_dict(value) -> dict:
+    """Treat anything that is not a JSON object as empty (captures are untrusted input)."""
+    return value if isinstance(value, dict) else {}
+
+
+def as_list(value) -> list:
+    return value if isinstance(value, list) else []
+
+
+def safe_int(value) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def mermaid_label(value, width: int = 45) -> str:
+    """Quote-safe Mermaid node label: a stray quote would otherwise end the label early."""
+    return clean(value, width).replace('"', "#quot;")
+
+
 def to_mermaid_id(path: str) -> str:
     candidate = re.sub(r"[^A-Za-z0-9_]", "_", path)
     return "page_" + (candidate.strip("_") or "home")[:50]
 
 
+def unique_mermaid_ids(paths: list) -> dict:
+    """Map each path to a distinct node id; '/a-b' and '/a_b' would otherwise collide."""
+    ids, used = {}, set()
+    for path in paths:
+        if path in ids:
+            continue
+        base = candidate = to_mermaid_id(path)
+        suffix = 2
+        while candidate in used:
+            candidate = f"{base}_{suffix}"
+            suffix += 1
+        ids[path] = candidate
+        used.add(candidate)
+    return ids
+
+
 def summarize(data: dict) -> str:
+    if not isinstance(data, dict):
+        raise ValueError("Capture must be a JSON object")
     if data.get("schema_version") != 2:
         raise ValueError("Unsupported capture schema. Expected schema_version = 2")
     pages = data.get("pages")
     if not isinstance(pages, list):
         raise ValueError("Capture must contain a pages array")
+    pages = [page for page in pages if isinstance(page, dict)]
     lines = [
         "# Website Reverse Engineering v2 | UI Reconnaissance",
         "",
@@ -47,20 +87,20 @@ def summarize(data: dict) -> str:
     for page in pages:
         path = str(page.get("path", "/"))
         seen_paths.append(path)
-        viewports = page.get("viewports") or {}
-        desktop = clean((viewports.get("desktop") or {}).get("screenshot", "Not captured"), 140)
-        mobile = clean((viewports.get("mobile") or {}).get("screenshot", "Not captured"), 140)
+        viewports = as_dict(page.get("viewports"))
+        desktop = clean(as_dict(viewports.get("desktop")).get("screenshot", "Not captured"), 140)
+        mobile = clean(as_dict(viewports.get("mobile")).get("screenshot", "Not captured"), 140)
         lines.append(f"| `{clean(path)}` | `{desktop}` | `{mobile}` |")
     lines += ["", "## Navigation graph (observed same-origin links)", "", "```mermaid", "flowchart LR"]
-    route_ids = {path: to_mermaid_id(path) for path in seen_paths}
-    for route in seen_paths:
-        lines.append(f'    {route_ids[route]}["{clean(route, 45)}"]')
+    route_ids = unique_mermaid_ids(seen_paths)
+    for route, node_id in route_ids.items():
+        lines.append(f'    {node_id}["{mermaid_label(route)}"]')
     edges = set()
     for page in pages:
-        origin = page.get("path")
-        desktop = (page.get("viewports") or {}).get("desktop") or {}
-        for linked in desktop.get("links") or []:
-            if linked in route_ids and linked != origin:
+        origin = str(page.get("path", "/"))
+        desktop = as_dict(as_dict(page.get("viewports")).get("desktop"))
+        for linked in as_list(desktop.get("links")):
+            if isinstance(linked, str) and linked in route_ids and linked != origin:
                 edges.add((origin, linked))
     for origin, target in sorted(edges):
         lines.append(f"    {route_ids[origin]} --> {route_ids[target]}")
@@ -72,16 +112,20 @@ def summarize(data: dict) -> str:
     all_tokens = {}
     for page in pages:
         route = clean(page.get("path", "/"))
-        for viewport, item in (page.get("viewports") or {}).items():
+        for viewport, item in as_dict(page.get("viewports")).items():
+            item = as_dict(item)
             landmarks = Counter(clean(x.get("role") or x.get("tag", "?"), 30)
-                                for x in (item.get("landmarks") or []))
+                                for x in as_list(item.get("landmarks")) if isinstance(x, dict))
             landmark_text = ", ".join(f"{kind} ×{count}" for kind, count in landmarks.most_common(8))
-            headings = "; ".join(clean(h.get("text", ""), 60) for h in (item.get("headings") or [])[:3])
-            lines.append(f"| `{route}` | {clean(viewport)} | {landmark_text or 'None recorded'} | {len(item.get('controls') or [])} | {headings or 'None recorded'} |")
+            headings = "; ".join(clean(h.get("text", ""), 60)
+                                 for h in as_list(item.get("headings"))[:3] if isinstance(h, dict))
+            lines.append(f"| `{route}` | {clean(viewport)} | {landmark_text or 'None recorded'} | {len(as_list(item.get('controls')))} | {headings or 'None recorded'} |")
             for token_type in ("text_colors", "backgrounds", "fonts", "font_sizes", "radii"):
-                for token in (item.get("tokens") or {}).get(token_type, [])[:12]:
+                for token in as_list(as_dict(item.get("tokens")).get(token_type))[:12]:
+                    if not isinstance(token, dict):
+                        continue
                     key = (token_type, clean(token.get("value"), 90))
-                    all_tokens[key] = all_tokens.get(key, 0) + int(token.get("count", 0))
+                    all_tokens[key] = all_tokens.get(key, 0) + safe_int(token.get("count"))
     lines += ["", "## Computed-style samples (not verified design tokens)", "",
               "| Property | Candidate value | Sample occurrences | Confidence |",
               "| --- | --- | ---: | --- |"]
@@ -106,7 +150,7 @@ def summarize(data: dict) -> str:
               "| Layout details | screenshots, review required | Unverified pending visual review |",
               "| Backend, APIs, state management, hosting | No relevant source inspected | Unknown |",
               "| True framework or CSS breakpoints | UI evidence alone is insufficient | Unknown |", ""]
-    for warning in data.get("warnings") or []:
+    for warning in as_list(data.get("warnings")):
         lines.append(f"- Capture note: {clean(warning, 180)}")
     lines += ["", "## Privacy and copyright", "",
               "Inspect and redact screenshots before sharing them. Do not copy restricted brand assets, protected text, or confidential site data without permission.", ""]
@@ -118,8 +162,11 @@ def main(argv=None):
     parser.add_argument("capture", type=Path, help="Path to capture.json produced by capture_site.mjs")
     parser.add_argument("--output", type=Path, help="Markdown report path (default: stdout)")
     args = parser.parse_args(argv)
-    data = json.loads(args.capture.read_text(encoding="utf-8"))
-    report = summarize(data)
+    try:
+        data = json.loads(args.capture.read_text(encoding="utf-8"))
+        report = summarize(data)
+    except (OSError, ValueError) as err:
+        parser.exit(2, f"Cannot analyze {args.capture}: {err}\n")
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(report, encoding="utf-8")

@@ -47,7 +47,7 @@ python3 reverse-engineer/scripts/inspect_repo.py examples/sample-app --format ma
 python3 reverse-engineer/scripts/inspect_repo.py /path/to/your/app --format json --output report.json
 ```
 
-The script performs conservative first-pass analysis of file extensions, common package manifests, indicative framework dependencies, and simple route signatures. It intentionally ignores dotfiles, common vendor directories, secret-bearing file names, symbolic links, and large files. **The report is not proof of runtime behavior** and must be verified against source.
+The script performs conservative first-pass analysis of file extensions, package manifests (npm, pip/pyproject, Go, Ruby, Cargo), indicative framework, data-store and third-party integration dependencies, route signatures (Express-style handlers, Python decorators, Django `path()`, `fetch`/`axios` calls), and file-system routes for Next.js, SvelteKit and Nuxt. It intentionally ignores dotfiles, common vendor directories, secret-bearing file names, symbolic links, and large files. **The report is not proof of runtime behavior** and must be verified against source.
 
 ## Tests
 
